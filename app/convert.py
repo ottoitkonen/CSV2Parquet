@@ -1,4 +1,4 @@
-import pandas as pd
+from pandas import read_csv, read_parquet
 
 
 class Convert:
@@ -35,8 +35,8 @@ class Convert:
 
     def convert(self):
         modules = {
-            "csv": pd.read_csv,
-            "parquet": pd.read_parquet,
+            "csv": read_csv,
+            "parquet": read_parquet,
         }
         module = modules.get(self.file_type)
         if module is None:
