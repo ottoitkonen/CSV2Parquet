@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "app"
+version = "1.0.0"
+description = "Simple GUI application for CSV-to-Parquet conversion."
+authors = ["Otto Itkonen <itkoo@pm.me>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.*"
+pandas = "^2.2.3"
+pyside6 = "^6.9.0"
+pyarrow = "^19.0.1"
+fastparquet = "^2024.11.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
