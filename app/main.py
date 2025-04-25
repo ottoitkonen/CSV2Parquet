@@ -73,8 +73,10 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(self.cancel_button)
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 1)
-        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("...")
+        self.progress_bar.setTextVisible(True)
 
         layout.addLayout(txt_layout)
         layout.addStretch()
@@ -121,11 +123,13 @@ class MainWindow(QMainWindow):
             self.convert_button.setEnabled(True)
             self.select_line.setText(self.input_file)
             self.output_line.setText(self.output_file)
+            self.progress_bar.setFormat("%p%")
+            self.progress_bar.setValue(0)
             print(f"Selected file: {self.input_file}")
 
     def convert_file(self):
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setValue(20)
         try:
             convert = Convert(
                 input_file=self.input_file,
@@ -135,12 +139,10 @@ class MainWindow(QMainWindow):
             convert.convert()
             dialog_msg = f"File converted successfully:\n{self.output_file}"
             success = True
-            self.progress_bar.setRange(0, 1)
-            self.progress_bar.setValue(1)
+            self.progress_bar.setValue(100)
         except Exception as e:
-            dialog_msg = ("Error converting file:\n", f"{e}")
+            dialog_msg = f"Error converting file:\n{e}"
             success = False
-            self.progress_bar.setRange(0, 1)
             self.progress_bar.setValue(0)
         finally:
             if success:

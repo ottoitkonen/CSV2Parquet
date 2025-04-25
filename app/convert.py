@@ -45,7 +45,16 @@ class Convert:
             low_memory = self.input_settings.get("low_memory", False)
             self.input_settings["low_memory"] = low_memory
 
-        dataframe = module(self.input_file, **self.input_settings)
+        try:
+            dataframe = module(self.input_file, **self.input_settings)
+        except Exception as e:
+            is_csv = self.file_type == "csv"
+            encoding = self.input_settings.get("encoding", "utf-8")
+            if is_csv and encoding == "utf-8":
+                self.input_settings["encoding"] = "ISO-8859-1"
+                dataframe = module(self.input_file, **self.input_settings)
+            else:
+                raise e
 
         if self.file_type == "csv":
             dataframe.to_parquet(self.output_file, **self.output_settings)
