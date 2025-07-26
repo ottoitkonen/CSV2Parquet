@@ -1,4 +1,4 @@
-from pandas import DataFrame, Timestamp, read_csv, read_parquet, to_datetime
+from pandas import DataFrame, DateOffset, Timestamp, read_csv, read_parquet, to_datetime
 
 
 class Convert:
@@ -35,10 +35,12 @@ class Convert:
         self.output_type = output_type or "parquet"
         self.input_settings = input_settings if input_settings else {}
         self.output_settings = output_settings if output_settings else {}
-        self.date_splits = ("Last Month Only", "Monthly", "Yearly")
+        self.date_splits = ("Last X Months", "Monthly", "Yearly")
 
     @staticmethod
     def read(input_type: str, input_file: str, **input_settings):
+        """Read a file based on its type and return a DataFrame."""
+
         modules = {
             "csv": read_csv,
             "parquet": read_parquet,
@@ -66,6 +68,8 @@ class Convert:
         return dataframe
 
     def save(self, dataframe: DataFrame, file_name: str, settings: dict):
+        """Save a DataFrame to a file based on the output type."""
+
         keep_index = settings.get("index", False)
         if self.output_type == "parquet":
             dataframe = dataframe.reset_index(drop=not keep_index)
@@ -75,16 +79,25 @@ class Convert:
             dataframe.to_csv(file_name, **settings)
 
     def save_by_date(
-        self, dataframe: DataFrame, date_col: str, split_by: str, settings: dict
+        self,
+        dataframe: DataFrame,
+        date_col: str,
+        split_by: str,
+        settings: dict,
+        **kwargs,
     ):
+        """Split the DataFrame by date and save each part to a separate file."""
+
         date_series = to_datetime(dataframe[date_col])
         lmonth, monthly, yearly = self.date_splits
         file_name = self.output_file
 
         if split_by == lmonth:
+            month_n = kwargs.get("month_n", 1)
             last_month = date_series.max()
             last_month = Timestamp(last_month.year, last_month.month, 1)
-            dataframe = dataframe.loc[date_series >= last_month]
+            last_month = last_month - DateOffset(months=month_n)
+            dataframe = dataframe.loc[date_series > last_month]
             self.save(dataframe, file_name, settings)
         else:
             if self.output_type in file_name:
@@ -106,6 +119,8 @@ class Convert:
                 self.save(group, part_name, settings)
 
     def save_by_parts(self, dataframe: DataFrame, parts: int, settings: dict):
+        """Split the DataFrame into parts and save each part to a separate file."""
+
         data_length = len(dataframe)
         file_name = self.output_file
         if self.output_type in file_name:
@@ -117,14 +132,18 @@ class Convert:
             self.save(dataframe.iloc[start:end], part_name, settings)
 
     def convert(self):
+        """Convert the input file to the output file format."""
+
         dataframe = self.read(self.input_type, self.input_file, **self.input_settings)
         # copy output_settings so that we won't modify a reference
         settings = {x[0]: x[1] for x in self.output_settings.items()}
         # to_split: 'date'/'length'/False
         to_split = settings.pop("to_split", None)
-        # split_by: 'Yearly'/'Monthly'/'Last Month Only'/int()
+        # split_by: 'Yearly'/'Monthly'/'Last X Months'/int()
         split_by = settings.pop("split_by", None)
         date_col = settings.pop("date_col", None)
+        # n of months for 'latest X months' option
+        month_n = settings.pop("month_n", 1)
 
         if to_split:
             try:
@@ -133,7 +152,9 @@ class Convert:
                     and (split_by in self.date_splits)
                     and (date_col in dataframe.columns)
                 ):
-                    self.save_by_date(dataframe, date_col, split_by, settings)
+                    self.save_by_date(
+                        dataframe, date_col, split_by, settings, month_n=month_n
+                    )
                 elif (to_split == "length") and ((parts := int(split_by)) > 0):
                     self.save_by_parts(dataframe, parts, settings)
                 else:

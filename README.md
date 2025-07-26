@@ -1,2 +1,2 @@
 # CSV2Parquet
-Simple GUI application for CSV-to-Parquet conversion.
+Simple GUI application to cut up and convert CSV and Parquet files.
