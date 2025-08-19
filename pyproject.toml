@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "app"
-version = "1.2.1"
+version = "1.2.2"
 description = "Simple GUI application for CSV-to-Parquet conversion."
 authors = ["Otto Itkonen <itkoo@pm.me>"]
 license = "MIT"

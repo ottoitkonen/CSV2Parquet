@@ -1,4 +1,4 @@
-from pandas import DataFrame, DateOffset, Timestamp, read_csv, read_parquet, to_datetime
+from pandas import DataFrame, DateOffset, read_csv, read_parquet, to_datetime
 
 
 class Convert:
@@ -40,7 +40,6 @@ class Convert:
     @staticmethod
     def read(input_type: str, input_file: str, **input_settings):
         """Read a file based on its type and return a DataFrame."""
-
         modules = {
             "csv": read_csv,
             "parquet": read_parquet,
@@ -69,7 +68,6 @@ class Convert:
 
     def save(self, dataframe: DataFrame, file_name: str, settings: dict):
         """Save a DataFrame to a file based on the output type."""
-
         keep_index = settings.get("index", False)
         if self.output_type == "parquet":
             dataframe = dataframe.reset_index(drop=not keep_index)
@@ -87,15 +85,13 @@ class Convert:
         **kwargs,
     ):
         """Split the DataFrame by date and save each part to a separate file."""
-
-        date_series = to_datetime(dataframe[date_col])
+        date_series = to_datetime(dataframe.loc[:, date_col])
         lmonth, monthly, yearly = self.date_splits
         file_name = self.output_file
 
         if split_by == lmonth:
             month_n = kwargs.get("month_n", 1)
-            last_month = date_series.max()
-            last_month = Timestamp(last_month.year, last_month.month, 1)
+            last_month = date_series.max().replace(day=1)
             last_month = last_month - DateOffset(months=month_n)
             dataframe = dataframe.loc[date_series > last_month]
             self.save(dataframe, file_name, settings)
@@ -120,7 +116,6 @@ class Convert:
 
     def save_by_parts(self, dataframe: DataFrame, parts: int, settings: dict):
         """Split the DataFrame into parts and save each part to a separate file."""
-
         data_length = len(dataframe)
         file_name = self.output_file
         if self.output_type in file_name:
@@ -133,7 +128,6 @@ class Convert:
 
     def convert(self):
         """Convert the input file to the output file format."""
-
         dataframe = self.read(self.input_type, self.input_file, **self.input_settings)
         # copy output_settings so that we won't modify a reference
         settings = {x[0]: x[1] for x in self.output_settings.items()}
@@ -159,9 +153,8 @@ class Convert:
                     self.save_by_parts(dataframe, parts, settings)
                 else:
                     raise
-            except Exception:
-                raise Exception(
-                    "Instructions to split the given table are not valid. Please confirm your settings!"
-                )
+            except Exception as e:
+                msg = f"Instructions to split the given table are not valid. Please confirm your settings!\n\nERR:{e}"
+                raise Exception(msg)
         else:
             self.save(dataframe, self.output_file, settings)

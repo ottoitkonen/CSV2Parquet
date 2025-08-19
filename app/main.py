@@ -358,6 +358,10 @@ class MainWindow(QMainWindow):
             self.input_file = file_name
             file_tuple = self.input_file.rsplit(".", 1)
             self.input_type = "parquet" if file_tuple[-1] == "parquet" else "csv"
+            # Reset output so we don't accidentally overwrite a previous selection
+            self.output_file = ""
+            self.output_line.setText("")
+            self.update_convert_button_state()
             self.update_preview_table()
             # Show actual file path
             self.select_line.setText(self.input_file)
@@ -447,6 +451,83 @@ class MainWindow(QMainWindow):
             self.input_settings = {}
         self.update_preview_table()
 
+    def _snapshot_ui_state(self) -> dict:
+        """Capture current UI selections so they can be restored after updates."""
+        return {
+            "split_mode": "no_split"
+            if self.radio_no_split.isChecked()
+            else "date"
+            if self.radio_split_date.isChecked()
+            else "length",
+            "parts": self.parts_spinbox.value(),
+            "timeframe": self.timeframe_combo.currentText(),
+            "months": self.months_spinbox.value(),
+            "input_dtype": "text" if self.radio_all_str.isChecked() else "infer",
+            "output_type": "parquet" if self.radio_parquet.isChecked() else "csv",
+            "date_col": self.date_col_combo.currentText(),
+        }
+
+    def _restore_ui_state(self, snapshot: dict, valid_date_columns: list[str]) -> None:
+        """Restore UI selections from snapshot without emitting signals."""
+        # Split radios
+        self.radio_no_split.blockSignals(True)
+        self.radio_split_date.blockSignals(True)
+        self.radio_split_length.blockSignals(True)
+        self.parts_spinbox.blockSignals(True)
+        self.timeframe_combo.blockSignals(True)
+        self.months_spinbox.blockSignals(True)
+        self.radio_all_str.blockSignals(True)
+        self.radio_infer_types.blockSignals(True)
+        self.radio_parquet.blockSignals(True)
+        self.radio_csv.blockSignals(True)
+        self.date_col_combo.blockSignals(True)
+        try:
+            mode = snapshot.get("split_mode")
+            if mode == "no_split":
+                self.radio_no_split.setChecked(True)
+            elif mode == "date":
+                self.radio_split_date.setChecked(True)
+            elif mode == "length":
+                self.radio_split_length.setChecked(True)
+
+            self.parts_spinbox.setValue(
+                snapshot.get("parts", self.parts_spinbox.value())
+            )
+            tf = snapshot.get("timeframe")
+            if tf:
+                idx = self.timeframe_combo.findText(tf)
+                if idx >= 0:
+                    self.timeframe_combo.setCurrentIndex(idx)
+            self.months_spinbox.setValue(
+                snapshot.get("months", self.months_spinbox.value())
+            )
+
+            if snapshot.get("input_dtype") == "text":
+                self.radio_all_str.setChecked(True)
+            else:
+                self.radio_infer_types.setChecked(True)
+
+            if snapshot.get("output_type") == "parquet":
+                self.radio_parquet.setChecked(True)
+            else:
+                self.radio_csv.setChecked(True)
+
+            dc = snapshot.get("date_col")
+            if dc and dc in valid_date_columns:
+                self.date_col_combo.setCurrentText(dc)
+        finally:
+            self.radio_no_split.blockSignals(False)
+            self.radio_split_date.blockSignals(False)
+            self.radio_split_length.blockSignals(False)
+            self.parts_spinbox.blockSignals(False)
+            self.timeframe_combo.blockSignals(False)
+            self.months_spinbox.blockSignals(False)
+            self.radio_all_str.blockSignals(False)
+            self.radio_infer_types.blockSignals(False)
+            self.radio_parquet.blockSignals(False)
+            self.radio_csv.blockSignals(False)
+            self.date_col_combo.blockSignals(False)
+
     def update_preview_table(self):
         """Update the preview table with the contents of the selected input file."""
 
@@ -464,6 +545,9 @@ class MainWindow(QMainWindow):
                     table_height = self.preview_table.minimumHeight()
                     self.resize(cur_size.width(), cur_size.height() + table_height)
             self.display_last = mode
+
+        # Snapshot current UI state
+        ui_snapshot = self._snapshot_ui_state()
 
         if not self.input_file:
             self.show_empty_preview()
@@ -495,9 +579,20 @@ class MainWindow(QMainWindow):
                 return
         rows, cols = df.shape
         self.df_size_label.setText(f"DataFrame: {rows:,} rows × {cols:,} columns")
-        self.date_col_combo.clear()  # Update date column dropdown
-        if len(df.columns) > 0:
-            self.date_col_combo.addItems(sorted(df.columns.tolist()))
+        # Update date columns and restore selections
+        self.date_col_combo.blockSignals(True)
+        try:
+            prev_dc = ui_snapshot.get("date_col")
+            self.date_col_combo.clear()
+            columns_sorted = sorted(df.columns.tolist())
+            if columns_sorted:
+                self.date_col_combo.addItems(columns_sorted)
+                if prev_dc in columns_sorted:
+                    self.date_col_combo.setCurrentText(prev_dc)
+        finally:
+            self.date_col_combo.blockSignals(False)
+        # Restore all other UI selections
+        self._restore_ui_state(ui_snapshot, df.columns.tolist())
 
         _set_preview(self.display_mode)
         if self.display_mode == 0:  # OFF (mode == 0): hide table
@@ -689,6 +784,10 @@ class MainWindow(QMainWindow):
                     self.input_type = (
                         "parquet" if file_tuple[-1] == "parquet" else "csv"
                     )
+                    # Reset output to prevent accidental overwrite when a new input is dropped
+                    self.output_file = ""
+                    self.output_line.setText("")
+                    self.update_convert_button_state()
                     self.select_line.setText(self.input_file)
                     self.select_line.setStyleSheet(
                         "background-color: white; color: black;"
